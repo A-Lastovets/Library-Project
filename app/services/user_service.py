@@ -94,4 +94,5 @@ async def get_current_user(
     if user is None:
         raise credentials_exception
 
+    print(f"🔍 Отриманий користувач: {user.username}, Роль: {user.role}")
     return user
