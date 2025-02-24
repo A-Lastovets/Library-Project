@@ -1,4 +1,4 @@
-from pydantic import BaseModel, EmailStr, Field
+from pydantic import BaseModel, EmailStr, Field, field_validator
 from typing import Optional, Annotated
 from datetime import datetime
 from enum import Enum
@@ -7,13 +7,28 @@ class UserRole(str, Enum):
     librarian = "librarian"
     reader = "reader"
 
+class LoginRequest(BaseModel):
+    email: EmailStr
+    password: str
+
 class UserBase(BaseModel):
     username: Annotated[str, Field(min_length=3, max_length=50)]
     email: EmailStr
 
-class UserCreate(UserBase):
-    password: Annotated[str, Field(min_length=8, max_length=100)]
+class UserCreate(BaseModel):
+    username: str = Field(..., min_length=3, max_length=50)
+    email: EmailStr
+    password: str = Field(..., min_length=8, max_length=100)
+    confirm_password: str = Field(..., min_length=8, max_length=100)
     secret_code: Optional[str] = None
+
+    @field_validator("confirm_password")
+    @classmethod
+    def passwords_match(cls, confirm_password: str, values):
+        """Перевіряємо, чи `password` і `confirm_password` співпадають."""
+        if values.data.get("password") and confirm_password != values.data["password"]:
+            raise ValueError("Passwords do not match")
+        return confirm_password
 
 class UserResponse(UserBase):
     id: int

@@ -1,5 +1,4 @@
 from fastapi import APIRouter, Depends, HTTPException, status
-from fastapi.security import OAuth2PasswordBearer, OAuth2PasswordRequestForm
 from sqlalchemy.ext.asyncio import AsyncSession
 from datetime import timedelta
 from sqlalchemy.future import select
@@ -8,7 +7,7 @@ from app.core.cache import redis_client
 from app.core.config import settings
 from app.models.user import User
 from app.schemas.schemas import (
-    Token, UserCreate, UserResponse, PasswordResetRequest, PasswordReset
+    Token, LoginRequest, UserCreate, UserResponse, PasswordResetRequest, PasswordReset
 )
 from app.services.user_service import (
     authenticate_user,
@@ -21,17 +20,15 @@ from app.services.user_service import (
 )
 from app.services.email_tasks import send_password_reset_email
 
-router = APIRouter(tags=["auth"])
-
-oauth2_scheme = OAuth2PasswordBearer(tokenUrl="token")
+router = APIRouter(prefix="/auth", tags=["auth"])
 
 # 🔑 Логін користувача (отримання JWT-токена)
-@router.post("/token", response_model=Token, status_code=status.HTTP_200_OK)
-async def login(
-    form_data: OAuth2PasswordRequestForm = Depends(), 
+@router.post("/sign-in", response_model=Token, status_code=status.HTTP_200_OK)
+async def sign_in(
+    login_data: LoginRequest,  # 🔹 Отримуємо JSON-запит
     db: AsyncSession = Depends(get_db)
 ):
-    user = await authenticate_user(db, form_data.username, form_data.password)
+    user = await authenticate_user(db, login_data.email, login_data.password)
     if not user:
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED, 
@@ -44,8 +41,9 @@ async def login(
     )
     return {"access_token": access_token, "token_type": "bearer"}
 
-@router.post("/register", response_model=UserResponse, status_code=status.HTTP_201_CREATED)
-async def register(user: UserCreate, db: AsyncSession = Depends(get_db)):
+# 🔹 Реєстрація користувача
+@router.post("/sign-up", response_model=UserResponse, status_code=status.HTTP_201_CREATED)
+async def sign_up(user: UserCreate, db: AsyncSession = Depends(get_db)):
     existing_user = await get_user_by_email(db, user.email)
     if existing_user:
         raise HTTPException(
@@ -58,7 +56,8 @@ async def register(user: UserCreate, db: AsyncSession = Depends(get_db)):
 
     return await create_user(db, user, role)
 
-@router.post("/password-reset-request", status_code=status.HTTP_200_OK)
+# 🔹 Запит на скидання пароля
+@router.post("/password-recovery", status_code=status.HTTP_200_OK)
 async def request_password_reset(data: PasswordResetRequest, db: AsyncSession = Depends(get_db)):
     user = await get_user_by_email(db, data.email)
     if not user:
@@ -70,6 +69,7 @@ async def request_password_reset(data: PasswordResetRequest, db: AsyncSession = 
     await send_password_reset_email(user.email, token)
     return {"message": "Password reset email sent"}
 
+# 🔹 Скидання пароля
 @router.post("/password-reset", status_code=status.HTTP_200_OK)
 async def reset_password(data: PasswordReset, db: AsyncSession = Depends(get_db)):
     email = await redis_client.get(f"password-reset:{data.token}")
@@ -87,6 +87,7 @@ async def reset_password(data: PasswordReset, db: AsyncSession = Depends(get_db)
 
     return {"message": "Password updated successfully"}
 
+# 🔹 Отримати інформацію про поточного користувача
 @router.get("/me", response_model=UserResponse, status_code=status.HTTP_200_OK)
 async def get_current_user_info(
     current_user: User = Depends(get_current_user)
@@ -98,12 +99,12 @@ async def get_current_user_info(
         role=current_user.role
     )
 
+# 🔹 Отримати всіх користувачів (тільки для librarian)
 @router.get("/users", response_model=list[UserResponse], status_code=status.HTTP_200_OK)
 async def get_all_users(
     db: AsyncSession = Depends(get_db), 
     current_user: User = Depends(get_current_user)
 ):
-    print(f"🔍 Поточний користувач: {current_user.username}, Роль: {current_user.role}")
     if current_user.role.value != "librarian":
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,

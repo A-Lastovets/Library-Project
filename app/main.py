@@ -1,6 +1,7 @@
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.security import OAuth2PasswordBearer
+from fastapi.openapi.utils import get_openapi
 from contextlib import asynccontextmanager
 from app.database import engine, Base
 from app.models.user import User
@@ -12,7 +13,7 @@ from app.core.config import settings
 import os
 
 # 🛡️ Додаємо підтримку Bearer Token для Swagger
-oauth2_scheme = OAuth2PasswordBearer(tokenUrl="token")
+oauth2_scheme = OAuth2PasswordBearer(tokenUrl="/auth/sign-in")
 
 pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
 
@@ -68,7 +69,7 @@ app = FastAPI(
 
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"] if settings.FRONTEND_URL == "*" else [settings.FRONTEND_URL],  # 🔥 Дозволяє всі домени (на продакшені вказати конкретні!)
+    allow_origins=["*"] if settings.FRONTEND_URL == "*" else [settings.FRONTEND_URL],
     allow_credentials=True,
     allow_methods=["*"],  # Дозволяє всі HTTP-методи (GET, POST, PUT, DELETE тощо)
     allow_headers=["*"],  # Дозволяє всі заголовки
