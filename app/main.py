@@ -8,6 +8,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.routes import auth, books, reservations, reviews
 from passlib.context import CryptContext
 from sqlalchemy import select
+from app.core.config import settings
 import os
 
 # 🛡️ Додаємо підтримку Bearer Token для Swagger
@@ -67,7 +68,7 @@ app = FastAPI(
 
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],  # 🔥 Дозволяє всі домени (на продакшені вказати конкретні!)
+    allow_origins=["*"] if settings.FRONTEND_URL == "*" else [settings.FRONTEND_URL],  # 🔥 Дозволяє всі домени (на продакшені вказати конкретні!)
     allow_credentials=True,
     allow_methods=["*"],  # Дозволяє всі HTTP-методи (GET, POST, PUT, DELETE тощо)
     allow_headers=["*"],  # Дозволяє всі заголовки

@@ -11,7 +11,7 @@ class DatabaseSettings(BaseSettings):
     ALGORITHM: str = 'HS256'
     ACCESS_TOKEN_EXPIRE_MINUTES: int = 30
     RESET_TOKEN_EXPIRE_MINUTES: int = 15
-    FRONTEND_URL: str
+    FRONTEND_URL: str = "*"
 
 class RedisSettings(BaseSettings):
     REDIS_PASSWORD: Optional[str] = None
