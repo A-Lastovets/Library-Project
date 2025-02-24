@@ -13,7 +13,6 @@ from app.services.email_tasks import send_reservation_email
 
 router = APIRouter(tags=["reservations"])
 
-# 📌 Створити запит на бронювання (читач)
 @router.post("/reservations", response_model=ReservationResponse)
 async def create_reservation(
     reservation: ReservationBase, 

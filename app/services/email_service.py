@@ -7,7 +7,7 @@ def send_email(to_email: str, subject: str, message: str):
     """Функція для надсилання email."""
     try:
         msg = MIMEMultipart()
-        msg["From"] = settings.EMAIL_FROM  # ✅ Оновлено
+        msg["From"] = settings.EMAIL_FROM
         msg["To"] = to_email
         msg["Subject"] = subject
 
@@ -23,7 +23,7 @@ def send_email(to_email: str, subject: str, message: str):
             raise ValueError("Unsupported SMTP port. Use 587 (TLS) or 465 (SSL).")
 
         # 🔹 Логін в SMTP-сервер
-        server.login(settings.SMTP_USERNAME, settings.SMTP_PASSWORD)  # ✅ Оновлено
+        server.login(settings.SMTP_USERNAME, settings.SMTP_PASSWORD)
 
         # 🔹 Надсилаємо email
         server.sendmail(settings.EMAIL_FROM, to_email, msg.as_string())

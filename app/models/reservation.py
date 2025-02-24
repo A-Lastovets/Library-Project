@@ -24,4 +24,3 @@ class Reservation(Base):
     book = relationship("Book", back_populates="reservations")
     user = relationship("User", back_populates="reservations", foreign_keys=[user_id])
     librarian = relationship("User", foreign_keys=[approved_by], overlaps="reservations_approved")
-

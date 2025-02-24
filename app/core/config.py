@@ -34,19 +34,19 @@ class CelerySettings(BaseSettings):
             self.CELERY_BROKER_URL = redis_settings.redis_url
 
 class SecuritySettings(BaseSettings):
-    SECRET_LIBRARIAN_CODE: str  # 🆕 Код для реєстрації бібліотекаря
+    SECRET_LIBRARIAN_CODE: str
 
 class EmailSettings(BaseSettings):
     SMTP_SERVER: str
     SMTP_PORT: int
     SMTP_USERNAME: str
     SMTP_PASSWORD: str
-    EMAIL_FROM: str  # 🆕 Адреса відправника email
+    EMAIL_FROM: str
 
 class AppSettings(DatabaseSettings, RedisSettings, CelerySettings, SecuritySettings, EmailSettings):
     class Config:
         env_file = "./.env"
-        env_file_encoding = "utf-8"  # ✅ Додано для підтримки кирилиці
+        env_file_encoding = "utf-8"
         extra = "allow"
 
 class LogConfig(BaseSettings):

@@ -1,3 +1,6 @@
+'''
+Email tasks
+'''
 from celery import Celery
 from app.core.config import settings
 from app.services.email_service import send_email

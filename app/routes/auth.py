@@ -23,7 +23,6 @@ from app.services.email_tasks import send_password_reset_email
 
 router = APIRouter(tags=["auth"])
 
-# ✅ Виправлення неправильного URL для авторизації
 oauth2_scheme = OAuth2PasswordBearer(tokenUrl="token")
 
 # 🔑 Логін користувача (отримання JWT-токена)
@@ -45,7 +44,6 @@ async def login(
     )
     return {"access_token": access_token, "token_type": "bearer"}
 
-# 🆕 Реєстрація користувача
 @router.post("/register", response_model=UserResponse, status_code=status.HTTP_201_CREATED)
 async def register(user: UserCreate, db: AsyncSession = Depends(get_db)):
     existing_user = await get_user_by_email(db, user.email)
@@ -60,7 +58,6 @@ async def register(user: UserCreate, db: AsyncSession = Depends(get_db)):
 
     return await create_user(db, user, role)
 
-# 📩 Запит на скидання пароля
 @router.post("/password-reset-request", status_code=status.HTTP_200_OK)
 async def request_password_reset(data: PasswordResetRequest, db: AsyncSession = Depends(get_db)):
     user = await get_user_by_email(db, data.email)
@@ -73,7 +70,6 @@ async def request_password_reset(data: PasswordResetRequest, db: AsyncSession = 
     await send_password_reset_email(user.email, token)
     return {"message": "Password reset email sent"}
 
-# 🔑 Скидання пароля
 @router.post("/password-reset", status_code=status.HTTP_200_OK)
 async def reset_password(data: PasswordReset, db: AsyncSession = Depends(get_db)):
     email = await redis_client.get(f"password-reset:{data.token}")
@@ -91,7 +87,6 @@ async def reset_password(data: PasswordReset, db: AsyncSession = Depends(get_db)
 
     return {"message": "Password updated successfully"}
 
-# 🆕 Отримання поточного користувача
 @router.get("/me", response_model=UserResponse, status_code=status.HTTP_200_OK)
 async def get_current_user_info(
     current_user: User = Depends(get_current_user)
@@ -108,7 +103,7 @@ async def get_all_users(
     db: AsyncSession = Depends(get_db), 
     current_user: User = Depends(get_current_user)
 ):
-    print(f"🔍 Поточний користувач: {current_user.username}, Роль: {current_user.role}")  # 👉 Додали логування
+    print(f"🔍 Поточний користувач: {current_user.username}, Роль: {current_user.role}")
     if current_user.role.value != "librarian":
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,

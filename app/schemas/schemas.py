@@ -3,33 +3,29 @@ from typing import Optional, Annotated
 from datetime import datetime
 from enum import Enum
 
-# 🟢 Ролі користувачів
 class UserRole(str, Enum):
     librarian = "librarian"
     reader = "reader"
 
-# 🟢 Базові схеми користувачів
 class UserBase(BaseModel):
     username: Annotated[str, Field(min_length=3, max_length=50)]
     email: EmailStr
 
 class UserCreate(UserBase):
     password: Annotated[str, Field(min_length=8, max_length=100)]
-    secret_code: Optional[str] = None  # Код для бібліотекаря (необов’язковий)
+    secret_code: Optional[str] = None
 
 class UserResponse(UserBase):
     id: int
     role: UserRole
 
     class Config:
-        from_attributes = True  # ✅ Виправлено
+        from_attributes = True
 
-# 🔹 Авторизація та токени
 class Token(BaseModel):
     access_token: str
     token_type: str
 
-# 🔹 Схеми для відновлення пароля
 class PasswordResetRequest(BaseModel):
     email: EmailStr
 
@@ -37,7 +33,6 @@ class PasswordReset(BaseModel):
     token: str
     new_password: Annotated[str, Field(min_length=8, max_length=100)]
 
-# 📚 Схеми книг
 class BookBase(BaseModel):
     title: str
     author: str
@@ -60,16 +55,15 @@ class BookUpdate(BaseModel):
     cover_image: Optional[str] = None
 
     class Config:
-        from_attributes = True  # ✅ Виправлено
+        from_attributes = True
 
 class BookResponse(BookBase):
     id: int
-    is_available: bool = True  # ✅ Додано дефолтне значення
+    is_available: bool = True
 
     class Config:
-        from_attributes = True  # ✅ Виправлено
+        from_attributes = True 
 
-# 📌 Бронювання книг
 class ReservationBase(BaseModel):
     book_id: int
 
@@ -82,12 +76,11 @@ class ReservationResponse(BaseModel):
     due_date: Optional[datetime] = None
 
     class Config:
-        from_attributes = True  # ✅ Виправлено
+        from_attributes = True
 
-# ⭐ Відгуки на книги
 class ReviewBase(BaseModel):
     book_id: int
-    rating: Annotated[int, Field(ge=1, le=5)]  # ✅ Обмежено оцінку від 1 до 5
+    rating: Annotated[int, Field(ge=1, le=5)]
     comment: str
 
 class ReviewResponse(ReviewBase):
@@ -96,4 +89,4 @@ class ReviewResponse(ReviewBase):
     created_at: datetime
 
     class Config:
-        from_attributes = True  # ✅ Виправлено
+        from_attributes = True

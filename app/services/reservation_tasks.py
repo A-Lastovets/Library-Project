@@ -30,6 +30,6 @@ def check_due_dates():
 celery.conf.beat_schedule = {
     "send_due_date_reminders": {
         "task": "app.tasks.reservation_tasks.check_due_dates",
-        "schedule": crontab(hour=0, minute=0),  # Виконання о 00:00
+        "schedule": crontab(hour=0, minute=0),
     },
 }

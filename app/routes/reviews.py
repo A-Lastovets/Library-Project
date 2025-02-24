@@ -19,7 +19,6 @@ async def create_review(
     if current_user.role != "reader":
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Not authorized")
 
-    # 📌 Перевіряємо, чи книга існує
     db_book = await db.get(Book, review.book_id)
     if not db_book:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Book not found")

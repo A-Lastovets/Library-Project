@@ -28,3 +28,4 @@ class Book(Base):
         back_populates="book",
         cascade="all, delete-orphan"
     )
+

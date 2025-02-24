@@ -19,8 +19,8 @@ async def get_user_by_email(db: AsyncSession, email: str):
     return result.scalar_one_or_none()
 
 # 🔹 Аутентифікація користувача
-async def authenticate_user(db: AsyncSession, username: str, password: str):
-    result = await db.execute(select(User).where(User.username == username))
+async def authenticate_user(db: AsyncSession, email: str, password: str):
+    result = await db.execute(select(User).where(User.email == email))
     user = result.scalar_one_or_none()
 
     if not user or not pwd_context.verify(password, user.hashed_password):
@@ -42,7 +42,7 @@ async def create_user(db: AsyncSession, user_data: UserCreate, role: str):
     hashed_password = pwd_context.hash(user_data.password)
 
     user = User(
-        username=user_data.username.lower(),
+        username=user_data.username.capitalize(),
         email=user_data.email.lower(),
         hashed_password=hashed_password,
         role=role  # ✅ Роль вже визначена в `auth.py`, тут її не треба перевизначати!

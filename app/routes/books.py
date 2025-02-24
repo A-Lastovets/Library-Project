@@ -10,7 +10,6 @@ from app.services.user_service import get_current_user
 
 router = APIRouter(tags=["books"])
 
-# 🟢 Додавання книги (тільки бібліотекар)
 @router.post("/books", response_model=BookResponse, status_code=status.HTTP_201_CREATED)
 async def create_book(
     book: BookCreate, 

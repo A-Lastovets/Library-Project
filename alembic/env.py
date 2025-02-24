@@ -4,15 +4,12 @@ from sqlalchemy import create_engine, pool
 from alembic import context
 from dotenv import load_dotenv
 
-# Завантажуємо змінні оточення
 load_dotenv()
 
-# Отримуємо URL бази даних
 DATABASE_URL = os.getenv("DATABASE_URL")
 if not DATABASE_URL:
     raise ValueError("❌ DATABASE_URL is not set in the environment variables!")
 
-# Перетворюємо asyncpg URL у psycopg2 (Alembic не підтримує asyncpg)
 SYNC_DATABASE_URL = DATABASE_URL.replace("postgresql+asyncpg", "postgresql+psycopg2")
 
 # Налаштовуємо конфігурацію Alembic
