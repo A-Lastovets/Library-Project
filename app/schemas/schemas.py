@@ -3,32 +3,40 @@ from typing import Optional, Annotated
 from datetime import datetime
 from enum import Enum
 
+# ✅ Базова схема для автоматичної конвертації в camelCase
+class BaseSchema(BaseModel):
+    class Config:
+        alias_generator = lambda string: ''.join(
+            word.capitalize() if i else word for i, word in enumerate(string.split('_'))
+        )  # ✅ Конвертує snake_case → camelCase
+        populate_by_name = True  # ✅ Дозволяє приймати snake_case, але повертати camelCase
+
 class UserRole(str, Enum):
     librarian = "librarian"
     reader = "reader"
 
-class LoginRequest(BaseModel):
+class LoginRequest(BaseSchema):
     email: EmailStr
     password: str
 
-class UserBase(BaseModel):
+class UserBase(BaseSchema):
     username: Annotated[str, Field(min_length=3, max_length=50)]
     email: EmailStr
 
-class UserCreate(BaseModel):
+class UserCreate(BaseSchema):
     username: str = Field(..., min_length=3, max_length=50)
     email: EmailStr
     password: str = Field(..., min_length=8, max_length=100)
-    confirm_password: str = Field(..., min_length=8, max_length=100)
-    secret_code: Optional[str] = None
+    confirmPassword: str = Field(..., min_length=8, max_length=100)
+    secretCode: Optional[str] = None
 
-    @field_validator("confirm_password")
+    @field_validator("confirmPassword")
     @classmethod
-    def passwords_match(cls, confirm_password: str, values):
-        """Перевіряємо, чи `password` і `confirm_password` співпадають."""
-        if values.data.get("password") and confirm_password != values.data["password"]:
+    def passwords_match(cls, confirmPassword: str, values):
+        """Перевіряємо, чи `password` і `confirmPassword` співпадають."""
+        if values.data.get("password") and confirmPassword != values.data["password"]:
             raise ValueError("Passwords do not match")
-        return confirm_password
+        return confirmPassword
 
 class UserResponse(UserBase):
     id: int
@@ -37,71 +45,71 @@ class UserResponse(UserBase):
     class Config:
         from_attributes = True
 
-class Token(BaseModel):
-    access_token: str
-    token_type: str
+class Token(BaseSchema):
+    accessToken: str = Field(..., alias="access_token") 
+    tokenType: str = Field(..., alias="token_type")
 
-class PasswordResetRequest(BaseModel):
+class PasswordResetRequest(BaseSchema):
     email: EmailStr
 
-class PasswordReset(BaseModel):
+class PasswordReset(BaseSchema):
     token: str
-    new_password: Annotated[str, Field(min_length=8, max_length=100)]
+    newPassword: Annotated[str, Field(min_length=8, max_length=100)]
 
-class BookBase(BaseModel):
+class BookBase(BaseSchema):
     title: str
     author: str
     year: int
     category: str
     language: str
     description: str
-    cover_image: Optional[str] = None
+    coverImage: Optional[str] = Field(None, alias="cover_image")
 
 class BookCreate(BookBase):
     pass
 
-class BookUpdate(BaseModel):
+class BookUpdate(BaseSchema):
     title: Optional[str] = None
     author: Optional[str] = None
     year: Optional[int] = None
     category: Optional[str] = None
     language: Optional[str] = None
     description: Optional[str] = None
-    cover_image: Optional[str] = None
+    coverImage: Optional[str] = Field(None, alias="cover_image")
 
     class Config:
         from_attributes = True
 
 class BookResponse(BookBase):
     id: int
-    is_available: bool = True
+    isAvailable: bool = Field(True, alias="is_available")
 
     class Config:
         from_attributes = True 
 
-class ReservationBase(BaseModel):
-    book_id: int
+class ReservationBase(BaseSchema):
+    bookId: int = Field(..., alias="book_id")
 
-class ReservationResponse(BaseModel):
+class ReservationResponse(BaseSchema):
     id: int
-    book_id: int
-    user_id: int
+    bookId: int = Field(..., alias="book_id") 
+    userId: int = Field(..., alias="user_id")
     status: str
-    reserved_at: datetime
-    due_date: Optional[datetime] = None
+    reservedAt: datetime = Field(..., alias="reserved_at")
+    dueDate: Optional[datetime] = Field(None, alias="due_date")
 
     class Config:
         from_attributes = True
 
-class ReviewBase(BaseModel):
-    book_id: int
+class ReviewBase(BaseSchema):
+    bookId: int = Field(..., alias="book_id")
     rating: Annotated[int, Field(ge=1, le=5)]
     comment: str
 
 class ReviewResponse(ReviewBase):
     id: int
-    user_id: int
-    created_at: datetime
+    userId: int = Field(..., alias="user_id")
+    createdAt: datetime = Field(..., alias="created_at")
 
     class Config:
         from_attributes = True

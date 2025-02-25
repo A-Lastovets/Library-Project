@@ -25,10 +25,10 @@ router = APIRouter(prefix="/auth", tags=["auth"])
 # 🔑 Логін користувача (отримання JWT-токена)
 @router.post("/sign-in", response_model=Token, status_code=status.HTTP_200_OK)
 async def sign_in(
-    login_data: LoginRequest,  # 🔹 Отримуємо JSON-запит
+    loginData: LoginRequest,  # 🔹 Отримуємо JSON-запит
     db: AsyncSession = Depends(get_db)
 ):
-    user = await authenticate_user(db, login_data.email, login_data.password)
+    user = await authenticate_user(db, loginData.email, loginData.password)
     if not user:
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED, 
@@ -36,23 +36,23 @@ async def sign_in(
             headers={"WWW-Authenticate": "Bearer"}
         )
     
-    access_token = create_access_token(
+    accessToken = create_access_token(
         {"sub": str(user.id)}, timedelta(minutes=settings.ACCESS_TOKEN_EXPIRE_MINUTES)
     )
-    return {"access_token": access_token, "token_type": "bearer"}
+    return {"access_token": accessToken, "token_type": "bearer"}
 
 # 🔹 Реєстрація користувача
 @router.post("/sign-up", response_model=UserResponse, status_code=status.HTTP_201_CREATED)
 async def sign_up(user: UserCreate, db: AsyncSession = Depends(get_db)):
-    existing_user = await get_user_by_email(db, user.email)
-    if existing_user:
+    existingUser = await get_user_by_email(db, user.email)
+    if existingUser:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST, 
             detail="Email already registered"
         )
 
-    secret_code = user.secret_code.strip() if user.secret_code and user.secret_code.strip() else None
-    role = "librarian" if secret_code == settings.SECRET_LIBRARIAN_CODE else "reader"
+    secretCode = user.secretCode.strip() if user.secretCode and user.secretCode.strip() else None
+    role = "librarian" if secretCode == settings.SECRET_LIBRARIAN_CODE else "reader"
 
     return await create_user(db, user, role)
 
@@ -82,7 +82,7 @@ async def reset_password(data: PasswordReset, db: AsyncSession = Depends(get_db)
     if not user:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="User not found")
 
-    await update_password(db, user.email, data.new_password)
+    await update_password(db, user.email, data.newPassword)
     await redis_client.delete(f"password-reset:{data.token}")
 
     return {"message": "Password updated successfully"}
@@ -90,22 +90,22 @@ async def reset_password(data: PasswordReset, db: AsyncSession = Depends(get_db)
 # 🔹 Отримати інформацію про поточного користувача
 @router.get("/me", response_model=UserResponse, status_code=status.HTTP_200_OK)
 async def get_current_user_info(
-    current_user: User = Depends(get_current_user)
+    currentUser: User = Depends(get_current_user)
 ):
     return UserResponse(
-        id=current_user.id,
-        username=current_user.username,
-        email=current_user.email,
-        role=current_user.role
+        id=currentUser.id,
+        username=currentUser.username,
+        email=currentUser.email,
+        role=currentUser.role
     )
 
 # 🔹 Отримати всіх користувачів (тільки для librarian)
 @router.get("/users", response_model=list[UserResponse], status_code=status.HTTP_200_OK)
 async def get_all_users(
     db: AsyncSession = Depends(get_db), 
-    current_user: User = Depends(get_current_user)
+    currentUser: User = Depends(get_current_user)
 ):
-    if current_user.role.value != "librarian":
+    if currentUser.role.value != "librarian":
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
             detail="Not enough permissions"

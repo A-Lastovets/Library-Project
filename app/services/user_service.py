@@ -11,7 +11,7 @@ from app.core.config import settings
 from app.database import get_db
 
 pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
-oauth2_scheme = OAuth2PasswordBearer(tokenUrl="token")
+oauth2_scheme = OAuth2PasswordBearer(tokenUrl="/auth/sign-in")
 
 # 🔹 Отримати користувача за email
 async def get_user_by_email(db: AsyncSession, email: str):
