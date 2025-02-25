@@ -23,9 +23,9 @@ from app.services.email_tasks import send_password_reset_email
 router = APIRouter(prefix="/auth", tags=["auth"])
 
 # 🔑 Логін користувача (отримання JWT-токена)
-@router.post("/sign-in", response_model=Token, status_code=status.HTTP_200_OK)
+@router.post("/sign-in", response_model=dict, status_code=status.HTTP_200_OK)
 async def sign_in(
-    loginData: LoginRequest,  # 🔹 Отримуємо JSON-запит
+    loginData: LoginRequest,  
     db: AsyncSession = Depends(get_db)
 ):
     user = await authenticate_user(db, loginData.email, loginData.password)
@@ -39,10 +39,20 @@ async def sign_in(
     accessToken = create_access_token(
         {"sub": str(user.id)}, timedelta(minutes=settings.ACCESS_TOKEN_EXPIRE_MINUTES)
     )
-    return {"access_token": accessToken, "token_type": "bearer"}
+
+    return {
+        "accessToken": accessToken,
+        "tokenType": "bearer",
+        "user": {
+            "id": user.id,
+            "username": user.username,
+            "email": user.email,
+            "role": user.role
+        }
+    }
 
 # 🔹 Реєстрація користувача
-@router.post("/sign-up", response_model=UserResponse, status_code=status.HTTP_201_CREATED)
+@router.post("/sign-up", response_model=dict, status_code=status.HTTP_201_CREATED)
 async def sign_up(user: UserCreate, db: AsyncSession = Depends(get_db)):
     existingUser = await get_user_by_email(db, user.email)
     if existingUser:
@@ -54,7 +64,23 @@ async def sign_up(user: UserCreate, db: AsyncSession = Depends(get_db)):
     secretCode = user.secretCode.strip() if user.secretCode and user.secretCode.strip() else None
     role = "librarian" if secretCode == settings.SECRET_LIBRARIAN_CODE else "reader"
 
-    return await create_user(db, user, role)
+    createdUser = await create_user(db, user, role)
+
+    # Створюємо токен одразу після реєстрації
+    accessToken = create_access_token(
+        {"sub": str(createdUser.id)}, timedelta(minutes=settings.ACCESS_TOKEN_EXPIRE_MINUTES)
+    )
+
+    return {
+        "accessToken": accessToken,
+        "tokenType": "bearer",
+        "user": {
+            "id": createdUser.id,
+            "username": createdUser.username,
+            "email": createdUser.email,
+            "role": createdUser.role
+        }
+    }
 
 # 🔹 Запит на скидання пароля
 @router.post("/password-recovery", status_code=status.HTTP_200_OK)
