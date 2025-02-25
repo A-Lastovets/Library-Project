@@ -1,4 +1,4 @@
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException, Form, status
 from sqlalchemy.ext.asyncio import AsyncSession
 from datetime import timedelta
 from sqlalchemy.future import select
@@ -25,10 +25,13 @@ router = APIRouter(prefix="/auth", tags=["auth"])
 # 🔑 Логін користувача (отримання JWT-токена)
 @router.post("/sign-in", response_model=dict, status_code=status.HTTP_200_OK)
 async def sign_in(
-    loginData: LoginRequest,  
+    email: str = Form(..., description="Email користувача"),
+    password: str = Form(..., description="Пароль"),
     db: AsyncSession = Depends(get_db)
 ):
-    user = await authenticate_user(db, loginData.email, loginData.password)
+    """ ✅ Підтримує `application/x-www-form-urlencoded` для Swagger і JSON для API """
+    
+    user = await authenticate_user(db, email, password)
     if not user:
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED, 

@@ -13,7 +13,6 @@ from app.core.config import settings
 import os
 
 # 🛡️ Додаємо підтримку Bearer Token для Swagger
-oauth2_scheme = OAuth2PasswordBearer(tokenUrl="/auth/sign-in")
 
 pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
 
