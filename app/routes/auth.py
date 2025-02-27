@@ -1,7 +1,10 @@
-from fastapi import APIRouter, Depends, HTTPException, Form, status
+from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import Request
+from fastapi.security import OAuth2PasswordRequestForm
 from sqlalchemy.ext.asyncio import AsyncSession
+from pydantic import ValidationError
+from sqlalchemy import select
 from datetime import timedelta
-from sqlalchemy.future import select
 from app.database import get_db
 from app.core.cache import redis_client
 from app.core.config import settings
@@ -23,22 +26,31 @@ from app.services.email_tasks import send_password_reset_email
 router = APIRouter(prefix="/auth", tags=["auth"])
 
 # 🔑 Логін користувача (отримання JWT-токена)
-@router.post("/sign-in", response_model=dict, status_code=status.HTTP_200_OK)
-async def sign_in(
-    email: str = Form(..., description="Email користувача"),
-    password: str = Form(..., description="Пароль"),
-    db: AsyncSession = Depends(get_db)
-):
-    """ ✅ Підтримує `application/x-www-form-urlencoded` для Swagger і JSON для API """
+@router.post("/sign-in", response_model=Token, status_code=status.HTTP_200_OK)
+async def sign_in(request: Request, login_data: LoginRequest, db: AsyncSession = Depends(get_db)):
+    """ ✅ Вхід через JSON """
+
+    raw_body = await request.json()  # 🔍 Подивимося, що реально приходить
+    print("Received raw JSON:", raw_body)
+
+    try:
+        login_data = LoginRequest(**raw_body)  # 🔹 Валідую JSON через Pydantic
+        print("Parsed LoginRequest:", login_data.model_dump())
+    except ValidationError as e:
+        print("Validation Error:", e.json())  # 🔴 Логи для дебагу
+        raise HTTPException(status_code=422, detail=e.errors())
     
-    user = await authenticate_user(db, email, password)
+    user = await authenticate_user(db, login_data.email, login_data.password)
     if not user:
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED, 
-            detail="Invalid credentials",
-            headers={"WWW-Authenticate": "Bearer"}
+            detail={
+                "error": "InvalidCredentials",
+                "message": "Invalid email or password. Please check your credentials and try again.",
+                "suggestion": "If you forgot your password, use the password recovery option."
+            }
         )
-    
+
     accessToken = create_access_token(
         {"sub": str(user.id)}, timedelta(minutes=settings.ACCESS_TOKEN_EXPIRE_MINUTES)
     )
@@ -48,21 +60,26 @@ async def sign_in(
         "tokenType": "bearer",
         "user": {
             "id": user.id,
-            "username": user.username,
+            "firstName": user.firstName,
+            "lastName": user.lastName,
             "email": user.email,
-            "role": user.role
+            "role": user.role.value
         }
     }
 
 # 🔹 Реєстрація користувача
-@router.post("/sign-up", response_model=dict, status_code=status.HTTP_201_CREATED)
+@router.post("/sign-up", response_model=Token, status_code=status.HTTP_201_CREATED)
 async def sign_up(user: UserCreate, db: AsyncSession = Depends(get_db)):
     existingUser = await get_user_by_email(db, user.email)
     if existingUser:
         raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST, 
-            detail="Email already registered"
-        )
+            status_code=status.HTTP_400_BAD_REQUEST,
+        detail={
+            "error": "UserAlreadyExists",
+            "message": "A user with this email is already registered.",
+            "suggestion": "Try logging in or use password recovery."
+        }
+    )
 
     secretCode = user.secretCode.strip() if user.secretCode and user.secretCode.strip() else None
     role = "librarian" if secretCode == settings.SECRET_LIBRARIAN_CODE else "reader"
@@ -79,9 +96,10 @@ async def sign_up(user: UserCreate, db: AsyncSession = Depends(get_db)):
         "tokenType": "bearer",
         "user": {
             "id": createdUser.id,
-            "username": createdUser.username,
+            "firstName": createdUser.firstName,
+            "lastName": createdUser.lastName,
             "email": createdUser.email,
-            "role": createdUser.role
+            "role": createdUser.role.value
         }
     }
 
@@ -98,8 +116,8 @@ async def request_password_reset(data: PasswordResetRequest, db: AsyncSession = 
     await send_password_reset_email(user.email, token)
     return {"message": "Password reset email sent"}
 
-# 🔹 Скидання пароля
-@router.post("/password-reset", status_code=status.HTTP_200_OK)
+# 🔹 Скидання пароля (повертаємо оновлену інформацію про користувача)
+@router.post("/password-reset", response_model=Token, status_code=status.HTTP_200_OK)
 async def reset_password(data: PasswordReset, db: AsyncSession = Depends(get_db)):
     email = await redis_client.get(f"password-reset:{data.token}")
     if not email:
@@ -111,22 +129,26 @@ async def reset_password(data: PasswordReset, db: AsyncSession = Depends(get_db)
     if not user:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="User not found")
 
-    await update_password(db, user.email, data.newPassword)
+    updatedUser = await update_password(db, user.email, data.newPassword)
     await redis_client.delete(f"password-reset:{data.token}")
 
-    return {"message": "Password updated successfully"}
-
-# 🔹 Отримати інформацію про поточного користувача
-@router.get("/me", response_model=UserResponse, status_code=status.HTTP_200_OK)
-async def get_current_user_info(
-    currentUser: User = Depends(get_current_user)
-):
-    return UserResponse(
-        id=currentUser.id,
-        username=currentUser.username,
-        email=currentUser.email,
-        role=currentUser.role
+    # Після скидання пароля повертаємо оновлену інформацію про користувача та новий токен
+    accessToken = create_access_token(
+        {"sub": str(updatedUser.id)}, timedelta(minutes=settings.ACCESS_TOKEN_EXPIRE_MINUTES)
     )
+
+    return {
+        "accessToken": accessToken,
+        "tokenType": "bearer",
+        "user": {
+            "id": updatedUser.id,
+            "firstName": updatedUser.firstName,
+            "lastName": updatedUser.lastName,
+            "email": updatedUser.email,
+            "role": updatedUser.role.value
+        }
+    }
+    # return {"message": "Password updated successfully"}  - перед змінами повертали це повідомлення, після змін ти прибрав його
 
 # 🔹 Отримати всіх користувачів (тільки для librarian)
 @router.get("/users", response_model=list[UserResponse], status_code=status.HTTP_200_OK)
@@ -142,4 +164,48 @@ async def get_all_users(
 
     result = await db.execute(select(User))
     users = result.scalars().all()
-    return users
+
+    return [
+        {
+            "id": user.id,
+            "firstName": user.firstName,
+            "lastName": user.lastName,
+            "email": user.email,
+            "role": user.role.value
+        }
+        for user in users
+    ]
+
+# 🔑 Логін через Swagger UI (OAuth2 Password Flow)
+@router.post("/sign-in-swagger", response_model=Token, status_code=status.HTTP_200_OK)
+async def sign_in_swagger(
+    form_data: OAuth2PasswordRequestForm = Depends(), 
+    db: AsyncSession = Depends(get_db)
+):
+    """ 🔄 Вхід через Swagger UI (OAuth2 Password Flow) """
+
+    email = form_data.username  # Swagger передає "username", але нам потрібен email
+    password = form_data.password
+
+    user = await authenticate_user(db, email, password)
+    if not user:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED, 
+            detail="Invalid email or password"
+        )
+
+    access_token = create_access_token(
+        {"sub": str(user.id)}, timedelta(minutes=settings.ACCESS_TOKEN_EXPIRE_MINUTES)
+    )
+
+    return {
+        "accessToken": access_token,
+        "tokenType": "bearer",
+        "user": {
+            "id": user.id,
+            "firstName": user.firstName,
+            "lastName": user.lastName,
+            "email": user.email,
+            "role": user.role.value
+        }
+    }

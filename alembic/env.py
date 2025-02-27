@@ -23,9 +23,9 @@ if config.config_file_name is not None:
 # 🟢 Явний імпорт всіх моделей
 from app.models.base import Base
 from app.models.user import User
-from app.models.book import Book
-from app.models.review import Review
-from app.models.reservation import Reservation
+# from app.models.book import Book
+# from app.models.review import Review
+# from app.models.reservation import Reservation
 
 # Призначаємо всі метаданні для Alembic
 target_metadata = Base.metadata

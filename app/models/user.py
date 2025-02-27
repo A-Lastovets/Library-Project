@@ -11,21 +11,21 @@ class User(Base):
     __tablename__ = "users"
 
     id = Column(Integer, primary_key=True, index=True)
-    username = Column(String, index=True, nullable=False)
+    firstName = Column(String, index=True, nullable=False)
+    lastName = Column(String, index=True, nullable=False)
     email = Column(String, unique=True, index=True, nullable=False)
-    hashed_password = Column(String, nullable=False)
+    hashedPassword = Column(String, nullable=False)
     role = Column(Enum(RoleEnum), default=RoleEnum.reader, nullable=False)
 
-    reservations = relationship(
-        "Reservation",
-        back_populates="user",
-        foreign_keys="[Reservation.user_id]"
-    )
+    # reservations = relationship(
+    #     "Reservation",
+    #     back_populates="user",
+    #     foreign_keys="[Reservation.userId]"
+    # )
     
-    reservations_approved = relationship(
-        "Reservation",
-        foreign_keys="[Reservation.approved_by]"
-    )
+    # reservationsApproved = relationship(
+    #     "Reservation",
+    #     foreign_keys="[Reservation.approvedBy]"
+    # )
 
-    reviews = relationship("Review", back_populates="user")
-
+    # reviews = relationship("Review", back_populates="user")

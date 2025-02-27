@@ -11,10 +11,10 @@ from app.core.config import settings
 from app.database import get_db
 
 pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
-oauth2_scheme = OAuth2PasswordBearer(tokenUrl="/auth/sign-in")
+oauth2_scheme = OAuth2PasswordBearer(tokenUrl="/auth/sign-in-swagger")
 
 # 🔹 Отримати користувача за email
-async def get_user_by_email(db: AsyncSession, email: str):
+async def get_user_by_email(db: AsyncSession, email: str)-> User | None:
     result = await db.execute(select(User).where(User.email == email.lower()))
     return result.scalar_one_or_none()
 
@@ -23,7 +23,7 @@ async def authenticate_user(db: AsyncSession, email: str, password: str):
     result = await db.execute(select(User).where(User.email == email))
     user = result.scalar_one_or_none()
 
-    if not user or not pwd_context.verify(password, user.hashed_password):
+    if not user or not pwd_context.verify(password, user.hashedPassword):
         return None
     return user
 
@@ -42,10 +42,11 @@ async def create_user(db: AsyncSession, user_data: UserCreate, role: str):
     hashed_password = pwd_context.hash(user_data.password)
 
     user = User(
-        username=user_data.username.capitalize(),
+        firstName=user_data.firstName.capitalize(),
+        lastName=user_data.lastName.capitalize(),
         email=user_data.email.lower(),
-        hashed_password=hashed_password,
-        role=role  # ✅ Роль вже визначена в `auth.py`, тут її не треба перевизначати!
+        hashedPassword=hashed_password,
+        role=role
     )
     db.add(user)
     await db.commit()
@@ -94,5 +95,5 @@ async def get_current_user(
     if user is None:
         raise credentials_exception
 
-    print(f"🔍 Отриманий користувач: {user.username}, Роль: {user.role}")
+    print(f"🔍 Отриманий користувач: {user.firstName}, Роль: {user.role}")
     return user
