@@ -82,6 +82,7 @@ async def get_current_user(
     )
 
     try:
+        print(f"🔍 Отриманий токен: {token}")
         payload = jwt.decode(token, settings.SECRET_KEY, algorithms=[settings.ALGORITHM])
         user_id: str = payload.get("sub")
         if user_id is None:
@@ -93,6 +94,7 @@ async def get_current_user(
     user = result.scalar_one_or_none()
 
     if user is None:
+        print("❌ Користувач не знайдений у базі!")
         raise credentials_exception
 
     print(f"🔍 Отриманий користувач: {user.firstName}, Роль: {user.role}")

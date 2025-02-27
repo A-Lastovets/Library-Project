@@ -30,14 +30,14 @@ router = APIRouter(prefix="/auth", tags=["auth"])
 async def sign_in(request: Request, login_data: LoginRequest, db: AsyncSession = Depends(get_db)):
     """ ✅ Вхід через JSON """
 
-    raw_body = await request.json()  # 🔍 Подивимося, що реально приходить
+    raw_body = await request.json()  # Подивимося, що реально приходить
     print("Received raw JSON:", raw_body)
 
     try:
         login_data = LoginRequest(**raw_body)  # 🔹 Валідую JSON через Pydantic
         print("Parsed LoginRequest:", login_data.model_dump())
     except ValidationError as e:
-        print("Validation Error:", e.json())  # 🔴 Логи для дебагу
+        print("Validation Error:", e.json())  # Логи для дебагу
         raise HTTPException(status_code=422, detail=e.errors())
     
     user = await authenticate_user(db, login_data.email, login_data.password)
@@ -148,7 +148,6 @@ async def reset_password(data: PasswordReset, db: AsyncSession = Depends(get_db)
             "role": updatedUser.role.value
         }
     }
-    # return {"message": "Password updated successfully"}  - перед змінами повертали це повідомлення, після змін ти прибрав його
 
 # 🔹 Отримати всіх користувачів (тільки для librarian)
 @router.get("/users", response_model=list[UserResponse], status_code=status.HTTP_200_OK)
@@ -156,6 +155,8 @@ async def get_all_users(
     db: AsyncSession = Depends(get_db), 
     currentUser: User = Depends(get_current_user)
 ):
+    print(f"🔍 Авторизований користувач: {currentUser.firstName}, роль: {currentUser.role}")
+
     if currentUser.role.value != "librarian":
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
@@ -163,6 +164,7 @@ async def get_all_users(
         )
 
     result = await db.execute(select(User))
+    print(f"resultat: {result}")
     users = result.scalars().all()
 
     return [
@@ -177,9 +179,9 @@ async def get_all_users(
     ]
 
 # 🔑 Логін через Swagger UI (OAuth2 Password Flow)
-@router.post("/sign-in-swagger", response_model=Token, status_code=status.HTTP_200_OK)
+@router.post("/sign-in-swagger", status_code=status.HTTP_200_OK)
 async def sign_in_swagger(
-    form_data: OAuth2PasswordRequestForm = Depends(), 
+    form_data: OAuth2PasswordRequestForm = Depends(),
     db: AsyncSession = Depends(get_db)
 ):
     """ 🔄 Вхід через Swagger UI (OAuth2 Password Flow) """
@@ -190,7 +192,7 @@ async def sign_in_swagger(
     user = await authenticate_user(db, email, password)
     if not user:
         raise HTTPException(
-            status_code=status.HTTP_401_UNAUTHORIZED, 
+            status_code=status.HTTP_401_UNAUTHORIZED,
             detail="Invalid email or password"
         )
 
@@ -199,13 +201,6 @@ async def sign_in_swagger(
     )
 
     return {
-        "accessToken": access_token,
-        "tokenType": "bearer",
-        "user": {
-            "id": user.id,
-            "firstName": user.firstName,
-            "lastName": user.lastName,
-            "email": user.email,
-            "role": user.role.value
-        }
+        "access_token": access_token,
+        "token_type": "bearer",       
     }
