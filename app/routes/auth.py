@@ -179,14 +179,14 @@ async def get_all_users(
     ]
 
 # 🔑 Логін через Swagger UI (OAuth2 Password Flow)
-@router.post("/sign-in-swagger", status_code=status.HTTP_200_OK)
+@router.post("/sign-in-swagger", status_code=status.HTTP_200_OK, include_in_schema=False)
 async def sign_in_swagger(
     form_data: OAuth2PasswordRequestForm = Depends(),
     db: AsyncSession = Depends(get_db)
 ):
     """ 🔄 Вхід через Swagger UI (OAuth2 Password Flow) """
 
-    email = form_data.username  # Swagger передає "username", але нам потрібен email
+    email = form_data.username
     password = form_data.password
 
     user = await authenticate_user(db, email, password)
