@@ -32,6 +32,20 @@ class UserCreate(BaseSchema):
     confirmPassword: str = Field(..., min_length=8, max_length=100)
     secretCode: Optional[str] = None
 
+    @field_validator("password")
+    @classmethod
+    def validate_password(cls, password: str):
+        """Перевіряє складність пароля"""
+        if len(password) < 8:
+            raise ValueError("Password must be at least 8 characters long.")
+        if not any(c.isupper() for c in password):
+            raise ValueError("Password must contain at least one uppercase letter.")
+        if not any(c.isdigit() for c in password):
+            raise ValueError("Password must contain at least one digit.")
+        if not any(c in "!@#$%^&*(),.?\":{}|<>" for c in password):
+            raise ValueError("Password must contain at least one special character.")
+        return password
+
     @field_validator("confirmPassword")
     @classmethod
     def passwords_match(cls, confirmPassword: str, values):
@@ -57,7 +71,21 @@ class PasswordResetRequest(BaseSchema):
 
 class PasswordReset(BaseSchema):
     token: str
-    newPassword: Annotated[str, Field(min_length=8, max_length=100)]
+    newPassword: str = Field(..., min_length=8, max_length=100)
+
+    @field_validator("newPassword")
+    @classmethod
+    def validate_new_password(cls, newPassword: str):
+        """Перевіряє складність нового пароля"""
+        if len(newPassword) < 8:
+            raise ValueError("Password must be at least 8 characters long.")
+        if not any(c.isupper() for c in newPassword):
+            raise ValueError("Password must contain at least one uppercase letter.")
+        if not any(c.isdigit() for c in newPassword):
+            raise ValueError("Password must contain at least one digit.")
+        if not any(c in "!@#$%^&*(),.?\":{}|<>" for c in newPassword):
+            raise ValueError("Password must contain at least one special character.")
+        return newPassword
 
 # class BookBase(BaseSchema):
 #     title: str

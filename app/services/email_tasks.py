@@ -1,28 +1,35 @@
-'''
-Email tasks
-'''
+import logging
 from celery import Celery
 from app.core.config import settings
 from app.services.email_service import send_email
 
 celery = Celery("email_tasks", broker=settings.CELERY_BROKER_URL)
 
-@celery.task
-def send_password_reset_email(email: str, reset_link: str):
+logger = logging.getLogger(__name__)
+
+@celery.task(bind=True, max_retries=3)
+def send_password_reset_email(self, email: str, reset_link: str):
     """Надсилає лист для скидання пароля."""
     subject = "Password Reset Request"
     message = f"""
-    Hello,
-    
-    You requested a password reset. Click the link below to reset your password:
-    {reset_link}
-    
-    If you did not request this, please ignore this email.
+    <html>
+        <body>
+            <p>Hello,</p>
+            <p>You requested a password reset. Click the link below to reset your password:</p>
+            <p><a href="{reset_link}" style="font-size: 16px; color: #007bff; text-decoration: none;">Reset Password</a></p>
+            <p>If you did not request this, please ignore this email.</p>
+        </body>
+    </html>
     """
-    send_email(email, subject, message)
+    try:
+        send_email(email, subject, message, html=True)
+        logger.info(f"Password reset email sent to {email}")
+    except Exception as e:
+        logger.error(f"Error sending password reset email to {email}: {e}")
+        raise self.retry(exc=e, countdown=10)  # Повторна спроба через 10 сек
 
-@celery.task
-def send_reservation_email(user_email: str, book_title: str, due_date: str):
+@celery.task(bind=True, max_retries=3)
+def send_reservation_email(self, user_email: str, book_title: str, due_date: str):
     """Надсилає лист про підтвердження бронювання."""
     subject = "Your book reservation is confirmed"
     message = f"""
@@ -33,10 +40,15 @@ def send_reservation_email(user_email: str, book_title: str, due_date: str):
 
     Thank you for using our library!
     """
-    send_email(user_email, subject, message)
+    try:
+        send_email(user_email, subject, message)
+        logger.info(f"Reservation email sent to {user_email}")
+    except Exception as e:
+        logger.error(f"Error sending reservation email to {user_email}: {e}")
+        raise self.retry(exc=e, countdown=10)
 
-@celery.task
-def send_due_date_reminder(user_email: str, book_title: str, due_date: str):
+@celery.task(bind=True, max_retries=3)
+def send_due_date_reminder(self, user_email: str, book_title: str, due_date: str):
     """Надсилає нагадування про необхідність повернення книги."""
     subject = "Reminder: Book return due soon"
     message = f"""
@@ -49,4 +61,9 @@ def send_due_date_reminder(user_email: str, book_title: str, due_date: str):
 
     Thank you for using our library!
     """
-    send_email(user_email, subject, message)
+    try:
+        send_email(user_email, subject, message)
+        logger.info(f"Due date reminder email sent to {user_email}")
+    except Exception as e:
+        logger.error(f"Error sending due date reminder to {user_email}: {e}")
+        raise self.retry(exc=e, countdown=10)

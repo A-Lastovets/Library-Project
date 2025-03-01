@@ -6,7 +6,8 @@ from contextlib import asynccontextmanager
 from app.database import engine, Base
 from app.models.user import User
 from sqlalchemy.ext.asyncio import AsyncSession
-from app.routes import auth, books, reservations, reviews
+from app.routes import auth 
+#books, reservations, reviews
 from passlib.context import CryptContext
 from sqlalchemy import select
 from app.core.config import settings

@@ -9,9 +9,7 @@ from app.database import get_db
 from app.core.cache import redis_client
 from app.core.config import settings
 from app.models.user import User
-from app.schemas.schemas import (
-    Token, LoginRequest, UserCreate, UserResponse, PasswordResetRequest, PasswordReset
-)
+from app.schemas.schemas import (Token, LoginRequest, UserCreate, UserResponse, PasswordResetRequest, PasswordReset)
 from app.services.user_service import (
     authenticate_user,
     create_access_token,
@@ -22,6 +20,9 @@ from app.services.user_service import (
     get_current_user
 )
 from app.services.email_tasks import send_password_reset_email
+from app.services.validate_pass import validate_password
+import logging
+logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/auth", tags=["auth"])
 
@@ -72,21 +73,23 @@ async def sign_in(request: Request, login_data: LoginRequest, db: AsyncSession =
 async def sign_up(user: UserCreate, db: AsyncSession = Depends(get_db)):
     existingUser = await get_user_by_email(db, user.email)
     if existingUser:
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-        detail={
+        error_detail = {
             "error": "UserAlreadyExists",
             "message": "A user with this email is already registered.",
             "suggestion": "Try logging in or use password recovery."
         }
-    )
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=error_detail)
 
-    secretCode = user.secretCode.strip() if user.secretCode and user.secretCode.strip() else None
-    role = "librarian" if secretCode == settings.SECRET_LIBRARIAN_CODE else "reader"
+    # 🔹 Валідація пароля перед створенням користувача
+    validate_password(user.password)
 
+    # 🔹 Визначення ролі користувача (лікар або читач)
+    role = "librarian" if user.secretCode and user.secretCode.strip() == settings.SECRET_LIBRARIAN_CODE else "reader"
+
+    # 🔹 Створюємо користувача
     createdUser = await create_user(db, user, role)
 
-    # Створюємо токен одразу після реєстрації
+    # 🔹 Генеруємо токен після реєстрації
     accessToken = create_access_token(
         {"sub": str(createdUser.id)}, timedelta(minutes=settings.ACCESS_TOKEN_EXPIRE_MINUTES)
     )
@@ -107,47 +110,49 @@ async def sign_up(user: UserCreate, db: AsyncSession = Depends(get_db)):
 @router.post("/password-recovery", status_code=status.HTTP_200_OK)
 async def request_password_reset(data: PasswordResetRequest, db: AsyncSession = Depends(get_db)):
     user = await get_user_by_email(db, data.email)
-    if not user:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="User not found")
+    # Завжди повертаємо одне й те саме повідомлення для безпеки
+    reset_link = None
+    if user:
+        token = create_password_reset_token(user.email)
+        await redis_client.setex(f"password-reset:{token}", settings.RESET_TOKEN_EXPIRE_MINUTES * 60, user.email)
+        reset_link = f"{settings.FRONTEND_URL}/reset-password?token={token}"
+        send_password_reset_email(user.email, reset_link)
 
-    token = create_password_reset_token(user.email)
-    await redis_client.setex(f"password-reset:{user.email}", settings.RESET_TOKEN_EXPIRE_MINUTES * 60, token)
-    
-    await send_password_reset_email(user.email, token)
-    return {"message": "Password reset email sent"}
+    return {"message": "If an account with that email exists, a password reset email has been sent."}
 
 # 🔹 Скидання пароля (повертаємо оновлену інформацію про користувача)
-@router.post("/password-reset", response_model=Token, status_code=status.HTTP_200_OK)
+@router.post("/password-reset", status_code=status.HTTP_200_OK)
 async def reset_password(data: PasswordReset, db: AsyncSession = Depends(get_db)):
-    email = await redis_client.get(f"password-reset:{data.token}")
-    if not email:
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST, detail="Invalid or expired token"
-        )
+    try:
+        email = await redis_client.get(f"password-reset:{data.token}")
+        if not email:
+            logger.warning(f"Invalid or expired token: {data.token}")  # 🔹 Лог помилки
+            raise HTTPException(status_code=400, detail="Invalid or expired token")
+        
+        await redis_client.delete(f"password-reset:{data.token}")  # Видаляємо токен перед оновленням
 
-    user = await get_user_by_email(db, email.decode())
+    except Exception as e:
+        logger.error(f"Error accessing Redis: {e}")  # 🔹 Лог реальної помилки
+        raise HTTPException(status_code=500, detail="Temporary server issue. Try again later.")
+
+    user = await get_user_by_email(db, email)
     if not user:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="User not found")
+        logger.warning(f"User not found for email: {email}")  # 🔹 Лог якщо юзера немає
+        raise HTTPException(status_code=404, detail="User not found")
 
-    updatedUser = await update_password(db, user.email, data.newPassword)
-    await redis_client.delete(f"password-reset:{data.token}")
+    # Валідація пароля
+    try:
+        validate_password(data.newPassword)
+    except ValueError as e:
+        logger.warning(f"Invalid password attempt for user {email}: {e}")  # 🔹 Лог валідації
+        raise HTTPException(status_code=400, detail=str(e))
 
-    # Після скидання пароля повертаємо оновлену інформацію про користувача та новий токен
-    accessToken = create_access_token(
-        {"sub": str(updatedUser.id)}, timedelta(minutes=settings.ACCESS_TOKEN_EXPIRE_MINUTES)
-    )
+    if not await update_password(db, user.email, data.newPassword):
+        logger.error(f"Failed to update password for user {email}")  # 🔹 Лог якщо пароль не змінився
+        raise HTTPException(status_code=500, detail="Could not update password. Try again later.")
 
-    return {
-        "accessToken": accessToken,
-        "tokenType": "bearer",
-        "user": {
-            "id": updatedUser.id,
-            "firstName": updatedUser.firstName,
-            "lastName": updatedUser.lastName,
-            "email": updatedUser.email,
-            "role": updatedUser.role.value
-        }
-    }
+    logger.info(f"Password reset successful for {email}")  # 🔹 Успішне оновлення пароля
+    return {"message": "Password has been reset successfully. Please log in again."}
 
 # 🔹 Отримати всіх користувачів (тільки для librarian)
 @router.get("/users", response_model=list[UserResponse], status_code=status.HTTP_200_OK)

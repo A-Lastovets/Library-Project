@@ -1,36 +1,58 @@
 import smtplib
+import logging
 from email.mime.text import MIMEText
 from email.mime.multipart import MIMEMultipart
 from app.core.config import settings
 
-def send_email(to_email: str, subject: str, message: str):
-    """Функція для надсилання email."""
+logger = logging.getLogger(__name__)
+
+class EmailClient:
+    """Контекстний менеджер для SMTP-з'єднання."""
+
+    def __init__(self):
+        self.server = None
+
+    def __enter__(self):
+        try:
+            if settings.SMTP_PORT == 587:
+                self.server = smtplib.SMTP(settings.SMTP_SERVER, settings.SMTP_PORT)
+                self.server.starttls()
+            elif settings.SMTP_PORT == 465:
+                self.server = smtplib.SMTP_SSL(settings.SMTP_SERVER, settings.SMTP_PORT)
+            else:
+                raise ValueError("Unsupported SMTP port. Use 587 (TLS) or 465 (SSL).")
+
+            self.server.login(settings.SMTP_USERNAME, settings.SMTP_PASSWORD)
+            return self.server
+        except Exception as e:
+            logger.error(f"Failed to connect to SMTP server: {e}")
+            raise
+
+    def __exit__(self, exc_type, exc_value, traceback):
+        if self.server:
+            self.server.quit()
+
+def send_email(to_email: str, subject: str, message: str, html=False):
+    """Функція для надсилання email з використанням контекстного менеджера."""
     try:
         msg = MIMEMultipart()
         msg["From"] = settings.EMAIL_FROM
         msg["To"] = to_email
         msg["Subject"] = subject
-
-        msg.attach(MIMEText(message, "plain"))
-
-        # 🔹 Визначаємо протокол: TLS (587) або SSL (465)
-        if settings.SMTP_PORT == 587:
-            server = smtplib.SMTP(settings.SMTP_SERVER, settings.SMTP_PORT)
-            server.starttls()  # Використовуємо TLS
-        elif settings.SMTP_PORT == 465:
-            server = smtplib.SMTP_SSL(settings.SMTP_SERVER, settings.SMTP_PORT)  # Використовуємо SSL
+        if html:
+            msg.attach(MIMEText(message, "html"))
         else:
-            raise ValueError("Unsupported SMTP port. Use 587 (TLS) or 465 (SSL).")
+            msg.attach(MIMEText(message, "plain"))
 
-        # 🔹 Логін в SMTP-сервер
-        server.login(settings.SMTP_USERNAME, settings.SMTP_PASSWORD)
+        with EmailClient() as server:
+            server.sendmail(settings.EMAIL_FROM, to_email, msg.as_string())
 
-        # 🔹 Надсилаємо email
-        server.sendmail(settings.EMAIL_FROM, to_email, msg.as_string())
-        server.quit()
-
+        logger.info(f"Email sent successfully to {to_email}")
         return {"message": "Email sent successfully"}
+    
     except smtplib.SMTPException as e:
+        logger.error(f"SMTP error: {e}")
         return {"error": f"SMTP error: {e}"}
     except Exception as e:
+        logger.error(f"General email error: {e}")
         return {"error": f"General error: {e}"}

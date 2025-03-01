@@ -66,7 +66,7 @@ async def update_password(db: AsyncSession, email: str, new_password: str):
     if not user:
         return None
 
-    user.hashed_password = pwd_context.hash(new_password)
+    user.hashedPassword = pwd_context.hash(new_password)
     await db.commit()
     return user
 
