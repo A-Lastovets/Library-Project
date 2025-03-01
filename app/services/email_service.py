@@ -39,10 +39,19 @@ def send_email(to_email: str, subject: str, message: str, html=False):
         msg["From"] = settings.EMAIL_FROM
         msg["To"] = to_email
         msg["Subject"] = subject
+
+        footer = """
+        --
+        This is an automated message. Please do not reply.
+
+        - Your Support Team
+        """
+
         if html:
-            msg.attach(MIMEText(message, "html"))
+            full_message = f"{message}<br><br><p>--<br>This is an automated message. Please do not reply.<br><br>- Your Support Team</p>"
+            msg.attach(MIMEText(full_message, "html"))
         else:
-            msg.attach(MIMEText(message, "plain"))
+            msg.attach(MIMEText(message + footer, "plain"))
 
         with EmailClient() as server:
             server.sendmail(settings.EMAIL_FROM, to_email, msg.as_string())
